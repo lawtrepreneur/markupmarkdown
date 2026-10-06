@@ -22,17 +22,17 @@ type Session struct {
 }
 
 type AuthState struct {
-	ID           string    `bson:"_id" json:"-"`
-	Redirect     string    `bson:"redirect,omitempty" json:"-"`
-	CookieValue  string    `bson:"cookie_value" json:"-"`
-	CreatedAt    time.Time `bson:"created_at" json:"-"`
+	ID          string    `bson:"_id" json:"-"`
+	Redirect    string    `bson:"redirect,omitempty" json:"-"`
+	CookieValue string    `bson:"cookie_value" json:"-"`
+	CreatedAt   time.Time `bson:"created_at" json:"-"`
 }
 
 type Document struct {
-	ID        string    `bson:"_id" json:"id"`
-	Title     string    `bson:"title" json:"title"`
-	SourceURL string    `bson:"source_url,omitempty" json:"sourceUrl,omitempty"`
-	Origin    string    `bson:"origin" json:"origin"` // "url" | "upload"
+	ID        string `bson:"_id" json:"id"`
+	Title     string `bson:"title" json:"title"`
+	SourceURL string `bson:"source_url,omitempty" json:"sourceUrl,omitempty"`
+	Origin    string `bson:"origin" json:"origin"` // "url" | "upload"
 	// SourceKind discriminates between the kinds of upstream source a
 	// doc can be cloned from. Newer than Origin; Origin is kept around
 	// because cmd/migrate-private/main.go still reads it. New code
@@ -42,7 +42,7 @@ type Document struct {
 	Content    string `bson:"content" json:"content"`
 	// Private is true when the source could only be read with GitHub auth.
 	// Readers of the cloned copy must also have GitHub access to {Owner, Repo}.
-	Private    bool   `bson:"private" json:"private"`
+	Private     bool   `bson:"private" json:"private"`
 	GitHubOwner string `bson:"github_owner,omitempty" json:"githubOwner,omitempty"`
 	GitHubRepo  string `bson:"github_repo,omitempty" json:"githubRepo,omitempty"`
 	GitHubRef   string `bson:"github_ref,omitempty" json:"githubRef,omitempty"`
@@ -125,8 +125,8 @@ const (
 // their repo access differs, which is the desired behavior. We store
 // only the source identity + minimal metadata; items are never frozen.
 type Index struct {
-	ID        string    `bson:"_id" json:"id"`
-	Kind      IndexKind `bson:"kind" json:"kind"`
+	ID   string    `bson:"_id" json:"id"`
+	Kind IndexKind `bson:"kind" json:"kind"`
 	// Owner is the GitHub login (user or org). Always set.
 	Owner string `bson:"owner" json:"owner"`
 	// Repo is set when Kind=="repo"; empty for user/org indexes.
@@ -322,8 +322,8 @@ type CheckRule struct {
 // stored: deterministic rules over content are cheap and can't go
 // stale.
 type CheckPolicy struct {
-	ID             string      `bson:"_id" json:"id"` // == root document id
-	RootDocumentID string      `bson:"root_document_id" json:"rootDocumentId"`
+	ID             string `bson:"_id" json:"id"` // == root document id
+	RootDocumentID string `bson:"root_document_id" json:"rootDocumentId"`
 	// TemplateID links this chain to a named CheckTemplate. When set,
 	// Rules is ignored and evaluation resolves the template's CURRENT
 	// rules — editing the template updates every linked doc. Editing a
@@ -386,8 +386,8 @@ const (
 // The ID is deterministic (docID + ":" + reviewer key) so re-requesting
 // the same reviewer upserts rather than duplicating.
 type ReviewRequest struct {
-	ID         string             `bson:"_id" json:"id"`
-	DocumentID string             `bson:"document_id" json:"documentId"`
+	ID         string `bson:"_id" json:"id"`
+	DocumentID string `bson:"document_id" json:"documentId"`
 	// Denormalized so the reviewer's queue can render without a join.
 	DocumentTitle string `bson:"document_title" json:"documentTitle"`
 
@@ -462,12 +462,12 @@ type Notification struct {
 //
 // The hierarchy is admin > write > read:
 //   - read:  list docs, read comments, list mention candidates,
-//            list notifications. Cannot write anything.
+//     list notifications. Cannot write anything.
 //   - write: read + add comments / replies, resolve threads, run
-//            revise_with_ai in preview mode. Cannot delete documents
-//            or accept AI revisions.
+//     revise_with_ai in preview mode. Cannot delete documents
+//     or accept AI revisions.
 //   - admin: write + delete documents, accept AI revisions (which
-//            creates a new child document), edit other authored fields.
+//     creates a new child document), edit other authored fields.
 type TokenScope string
 
 const (
@@ -490,16 +490,16 @@ func (s TokenScope) AllowsScope(need TokenScope) bool {
 //
 // We store only SHA-256(token), never the plaintext.
 type APIToken struct {
-	ID         string     `bson:"_id" json:"id"`
-	UserID     string     `bson:"user_id" json:"-"`
-	Hash       string     `bson:"hash" json:"-"`
+	ID     string `bson:"_id" json:"id"`
+	UserID string `bson:"user_id" json:"-"`
+	Hash   string `bson:"hash" json:"-"`
 	// AutoReview opts this token into backend-fulfilled reviews: when a
 	// review request targets it, the server itself performs the review
 	// with Claude (using the owner's stored Anthropic key) instead of
 	// waiting for an external agent to poll. The review is written
 	// through the same internal paths an external agent would use, so
 	// badges, gates, and fulfillment all behave identically.
-	AutoReview bool `bson:"auto_review,omitempty" json:"autoReview,omitempty"`
+	AutoReview bool       `bson:"auto_review,omitempty" json:"autoReview,omitempty"`
 	Prefix     string     `bson:"prefix" json:"prefix"` // first 12 chars of token (e.g. "mmk_a3f7c2…")
 	Label      string     `bson:"label" json:"label"`
 	Scope      TokenScope `bson:"scope,omitempty" json:"scope"`
@@ -529,11 +529,12 @@ type UserSecrets struct {
 }
 
 type Anchor struct {
-	Start int    `bson:"start" json:"start"`
-	End   int    `bson:"end" json:"end"`
-	Exact string `bson:"exact" json:"exact"`
-	Prefix string `bson:"prefix,omitempty" json:"prefix,omitempty"`
-	Suffix string `bson:"suffix,omitempty" json:"suffix,omitempty"`
+	Start       int    `bson:"start" json:"start"`
+	End         int    `bson:"end" json:"end"`
+	Exact       string `bson:"exact" json:"exact"`
+	Prefix      string `bson:"prefix,omitempty" json:"prefix,omitempty"`
+	Suffix      string `bson:"suffix,omitempty" json:"suffix,omitempty"`
+	ParagraphID string `bson:"paragraph_id,omitempty" json:"paragraphId,omitempty"`
 }
 
 // ActorKind distinguishes human-authored from agent-authored content. We
@@ -560,34 +561,34 @@ type Reply struct {
 	TokenID    string `bson:"token_id,omitempty" json:"-"`
 	OwnerName  string `bson:"-" json:"ownerName,omitempty"`
 	OwnerLogin string `bson:"-" json:"ownerLogin,omitempty"`
-	Body            string    `bson:"body" json:"body"`
-	BodyHTML        string    `bson:"-" json:"bodyHtml,omitempty"`
+	Body       string `bson:"body" json:"body"`
+	BodyHTML   string `bson:"-" json:"bodyHtml,omitempty"`
 	// Mine is computed at read time: true when the viewer is the human
 	// behind this reply — either as the direct author or as the owner of
 	// the bot/token that wrote it. Drives the edit/delete affordances in
 	// the UI; never persisted.
-	Mine            bool      `bson:"-" json:"mine,omitempty"`
-	CreatedAt       time.Time `bson:"created_at" json:"createdAt"`
-	UpdatedAt       time.Time `bson:"updated_at" json:"updatedAt"`
+	Mine      bool      `bson:"-" json:"mine,omitempty"`
+	CreatedAt time.Time `bson:"created_at" json:"createdAt"`
+	UpdatedAt time.Time `bson:"updated_at" json:"updatedAt"`
 }
 
 type Comment struct {
-	ID              string    `bson:"_id" json:"id"`
-	DocumentID      string    `bson:"document_id" json:"documentId"`
-	Anchor          Anchor    `bson:"anchor" json:"anchor"`
-	Author          string    `bson:"author" json:"author"`
-	AuthorID        string    `bson:"author_id,omitempty" json:"-"`
-	AuthorAvatarURL string    `bson:"author_avatar_url,omitempty" json:"authorAvatarUrl,omitempty"`
-	ActorKind       ActorKind `bson:"actor_kind,omitempty" json:"actorKind,omitempty"`
-	TokenID         string    `bson:"token_id,omitempty" json:"-"`
-	OwnerName       string    `bson:"-" json:"ownerName,omitempty"`
-	OwnerLogin      string    `bson:"-" json:"ownerLogin,omitempty"`
-	Body            string    `bson:"body" json:"body"`
-	BodyHTML        string    `bson:"-" json:"bodyHtml,omitempty"` // populated only when render=html requested
-	Resolved   bool      `bson:"resolved" json:"resolved"`
-	ResolvedBy string    `bson:"resolved_by,omitempty" json:"resolvedBy,omitempty"`
-	ResolvedAt *time.Time `bson:"resolved_at,omitempty" json:"resolvedAt,omitempty"`
-	Replies    []Reply   `bson:"replies" json:"replies"`
+	ID              string     `bson:"_id" json:"id"`
+	DocumentID      string     `bson:"document_id" json:"documentId"`
+	Anchor          Anchor     `bson:"anchor" json:"anchor"`
+	Author          string     `bson:"author" json:"author"`
+	AuthorID        string     `bson:"author_id,omitempty" json:"-"`
+	AuthorAvatarURL string     `bson:"author_avatar_url,omitempty" json:"authorAvatarUrl,omitempty"`
+	ActorKind       ActorKind  `bson:"actor_kind,omitempty" json:"actorKind,omitempty"`
+	TokenID         string     `bson:"token_id,omitempty" json:"-"`
+	OwnerName       string     `bson:"-" json:"ownerName,omitempty"`
+	OwnerLogin      string     `bson:"-" json:"ownerLogin,omitempty"`
+	Body            string     `bson:"body" json:"body"`
+	BodyHTML        string     `bson:"-" json:"bodyHtml,omitempty"` // populated only when render=html requested
+	Resolved        bool       `bson:"resolved" json:"resolved"`
+	ResolvedBy      string     `bson:"resolved_by,omitempty" json:"resolvedBy,omitempty"`
+	ResolvedAt      *time.Time `bson:"resolved_at,omitempty" json:"resolvedAt,omitempty"`
+	Replies         []Reply    `bson:"replies" json:"replies"`
 	// Orphan is true when the source document changed and we could not
 	// unambiguously re-anchor this comment in the new content (zero
 	// matches, multiple matches, or the user/agent created it as a
@@ -595,7 +596,7 @@ type Comment struct {
 	// a dedicated section at the bottom of the doc and offer a manual
 	// re-anchor flow. Stored so the orphan state survives reloads even
 	// without a new SHA check.
-	Orphan        bool   `bson:"orphan,omitempty" json:"orphan,omitempty"`
+	Orphan bool `bson:"orphan,omitempty" json:"orphan,omitempty"`
 	// OriginalExact preserves the quoted text from before the re-anchor
 	// attempt failed. The current Anchor.Exact still reflects the last
 	// successful match; OriginalExact is what we render in the orphan
@@ -617,9 +618,9 @@ type Comment struct {
 	// because there's nothing to replace.
 	Suggestion *Suggestion `bson:"suggestion,omitempty" json:"suggestion,omitempty"`
 	// Mine is computed at read time. See Reply.Mine for semantics.
-	Mine       bool      `bson:"-" json:"mine,omitempty"`
-	CreatedAt  time.Time `bson:"created_at" json:"createdAt"`
-	UpdatedAt  time.Time `bson:"updated_at" json:"updatedAt"`
+	Mine      bool      `bson:"-" json:"mine,omitempty"`
+	CreatedAt time.Time `bson:"created_at" json:"createdAt"`
+	UpdatedAt time.Time `bson:"updated_at" json:"updatedAt"`
 }
 
 // Suggestion is a structured edit proposal on an anchored comment.
@@ -628,9 +629,9 @@ type Comment struct {
 // stamped when a reviewer clicks Apply, so subsequent viewers can see
 // the suggestion was already used.
 type Suggestion struct {
-	Replacement   string     `bson:"replacement" json:"replacement"`
-	AppliedAt     *time.Time `bson:"applied_at,omitempty" json:"appliedAt,omitempty"`
-	AppliedByID   string     `bson:"applied_by_id,omitempty" json:"-"`
-	AppliedBy     string     `bson:"applied_by,omitempty" json:"appliedBy,omitempty"`
-	AppliedDocID  string     `bson:"applied_doc_id,omitempty" json:"appliedDocId,omitempty"`
+	Replacement  string     `bson:"replacement" json:"replacement"`
+	AppliedAt    *time.Time `bson:"applied_at,omitempty" json:"appliedAt,omitempty"`
+	AppliedByID  string     `bson:"applied_by_id,omitempty" json:"-"`
+	AppliedBy    string     `bson:"applied_by,omitempty" json:"appliedBy,omitempty"`
+	AppliedDocID string     `bson:"applied_doc_id,omitempty" json:"appliedDocId,omitempty"`
 }

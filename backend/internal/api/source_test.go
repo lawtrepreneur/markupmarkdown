@@ -116,3 +116,60 @@ func TestValidateManualAnchor_AcceptsMatchInContent(t *testing.T) {
 		t.Fatalf("expected success: %v", err)
 	}
 }
+
+const anchorSentence = "the verification stage runs the full integration suite against a disposable database"
+
+func reanchorOne(t *testing.T, a models.Anchor, doc string) reanchorResult {
+	t.Helper()
+	return reanchorComments([]models.Comment{{ID: "c1", Anchor: a}}, doc)[0]
+}
+
+func TestReanchor_ParagraphSplit(t *testing.T) {
+	doc := "Intro line.\n\nThe pipeline has stages. Then " + anchorSentence + " and reports.\n\nTail."
+	split := "Intro line.\n\nThe pipeline has stages.\n\nThen the verification stage runs the full, integration suite against a disposable database and reports.\n\nTail."
+	res := reanchorOne(t, models.Anchor{Exact: anchorSentence}, doc)
+	if res.Status != reanchorClean || res.Fuzzy {
+		t.Fatalf("exact baseline: %+v", res)
+	}
+	res = reanchorOne(t, models.Anchor{Exact: anchorSentence, ParagraphID: res.ParagraphID}, split)
+	if res.Status != reanchorClean || !res.Fuzzy || res.ParagraphID == "" {
+		t.Fatalf("split: %+v", res)
+	}
+}
+
+func TestReanchor_ParagraphMerge(t *testing.T) {
+	merged := "Intro line. Then the verification stage runs the full, integration suite against a disposable database. Tail."
+	res := reanchorOne(t, models.Anchor{Exact: anchorSentence, ParagraphID: "3"}, merged)
+	if res.Status != reanchorClean || !res.Fuzzy {
+		t.Fatalf("merge: %+v", res)
+	}
+}
+
+func TestReanchor_SentenceMoved(t *testing.T) {
+	moved := "Moved up top: the verification stage runs the full, integration suite against a disposable database.\n\nOther paragraph about rollbacks being manual."
+	res := reanchorOne(t, models.Anchor{Exact: anchorSentence, ParagraphID: "5"}, moved)
+	if res.Status != reanchorClean || !res.Fuzzy || res.ParagraphID != "0" {
+		t.Fatalf("moved: %+v", res)
+	}
+}
+
+func TestReanchor_PrefixSuffixDisambiguatesExact(t *testing.T) {
+	doc := "alpha one. ship it now. beta.\n\nGamma two. ship it now. delta."
+	res := reanchorOne(t, models.Anchor{Exact: "ship it now", Prefix: "Gamma two. ", Suffix: ". delta."}, doc)
+	if res.Status != reanchorClean || res.Fuzzy || res.ParagraphID != "1" {
+		t.Fatalf("prefix/suffix: %+v", res)
+	}
+}
+
+func TestReanchor_FuzzyWinsByParagraphID(t *testing.T) {
+	doc := "The verification stage runs the full, integration suite against a disposable database.\n\n" +
+		"The verification stage runs the full integration suite against a disposable databases."
+	res := reanchorOne(t, models.Anchor{Exact: anchorSentence, ParagraphID: "1"}, doc)
+	if res.Status != reanchorClean || !res.Fuzzy || res.ParagraphID != "1" {
+		t.Fatalf("paragraph winner: %+v", res)
+	}
+	res = reanchorOne(t, models.Anchor{Exact: anchorSentence}, doc)
+	if res.Status != reanchorOrphan {
+		t.Fatalf("ambiguous must orphan: %+v", res)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -436,14 +437,14 @@ func (a *API) sourceCheckResponse(ctx context.Context, current, target *models.D
 // reanchor maps each comment's anchor.exact into the new content.
 // Outcome:
 //   - clean:  exact text still appears somewhere in new source → keep
-//             the comment as anchored, defer to the frontend's
-//             textContent fallback (start=end=0) to highlight the new
-//             rendered position. We don't try to compute new
-//             textContent offsets server-side; the markdown source
-//             coordinate space is not the same as the rendered
-//             textContent space.
+//     the comment as anchored, defer to the frontend's
+//     textContent fallback (start=end=0) to highlight the new
+//     rendered position. We don't try to compute new
+//     textContent offsets server-side; the markdown source
+//     coordinate space is not the same as the rendered
+//     textContent space.
 //   - orphan: exact text doesn't appear at all → flip Orphan=true and
-//             stash OriginalExact for the orphan card.
+//     stash OriginalExact for the orphan card.
 //
 // Doc-level comments (Anchor.Exact == "") are left untouched.
 //
@@ -478,7 +479,7 @@ func reanchorComments(comments []models.Comment, newContent string) []reanchorRe
 		// don't accidentally orphan code-block / metadata anchors
 		// PlainText might collapse.
 		if strings.Contains(plain, exact) || strings.Contains(newContent, exact) {
-			out[i] = reanchorResult{ID: c.ID, Status: reanchorClean, Exact: exact}
+			out[i] = reanchorResult{ID: c.ID, Status: reanchorClean, Exact: exact, ParagraphID: exactParagraphID(plain, c.Anchor, exact)}
 			continue
 		}
 		// Fuzzy fallback (Phase 3): the exact text is gone, but a
@@ -486,10 +487,11 @@ func reanchorComments(comments []models.Comment, newContent string) []reanchorRe
 		// unambiguous matches re-anchor with Fuzzy=true (the UI shows a
 		// "≈" hint and OriginalExact keeps the provenance); everything
 		// else orphans as before.
-		if match, ok := fuzzyFindAnchor(plain, exact); ok {
+		if match, pid, ok := fuzzyFindScoped(plain, c.Anchor, exact); ok {
 			out[i] = reanchorResult{
 				ID:            c.ID,
 				Status:        reanchorClean,
+				ParagraphID:   pid,
 				Exact:         match,
 				OriginalExact: pickOriginalExact(c, exact),
 				Fuzzy:         true,
@@ -531,6 +533,86 @@ type reanchorResult struct {
 	// commenter originally selected. Consumers persist both plus a
 	// fuzzy_reanchored flag so the UI can hint "≈ re-anchored".
 	Fuzzy bool
+	// ParagraphID is the index of the rendered-plain-text line holding
+	// the match; persisted as anchor.paragraph_id when known.
+	ParagraphID string
+}
+
+func paragraphIDAt(plain string, idx int) string {
+	return strconv.Itoa(strings.Count(plain[:idx], "\n"))
+}
+
+// ctxMatches reports whether the text around plain[idx:idx+len(m)]
+// agrees with the stored Prefix/Suffix (empty ones are ignored).
+func ctxMatches(plain string, idx int, m string, a models.Anchor) bool {
+	if a.Prefix == "" && a.Suffix == "" {
+		return false
+	}
+	return strings.HasSuffix(plain[:idx], a.Prefix) && strings.HasPrefix(plain[idx+len(m):], a.Suffix)
+}
+
+// exactParagraphID picks among repeated exact hits: prefix/suffix
+// first, then the stored paragraph, else the first hit.
+func exactParagraphID(plain string, a models.Anchor, exact string) string {
+	first, from := -1, 0
+	for {
+		j := strings.Index(plain[from:], exact)
+		if j < 0 {
+			break
+		}
+		idx := from + j
+		if first < 0 {
+			first = idx
+		}
+		if ctxMatches(plain, idx, exact, a) {
+			return paragraphIDAt(plain, idx)
+		}
+		from = idx + 1
+	}
+	if first < 0 {
+		return ""
+	}
+	return paragraphIDAt(plain, first)
+}
+
+// fuzzyFindScoped runs the fuzzy matcher per paragraph first (the
+// stored ParagraphID wins, then Prefix/Suffix break ties; any other
+// multi-paragraph tie is refused), and falls back to the whole doc
+// only when no paragraph matches alone (split/merge/moved text).
+func fuzzyFindScoped(plain string, a models.Anchor, exact string) (string, string, bool) {
+	type hit struct{ match, id string }
+	var hits []hit
+	for i, p := range strings.Split(plain, "\n") {
+		if m, ok := fuzzyFindAnchor(p, exact); ok {
+			hits = append(hits, hit{m, strconv.Itoa(i)})
+		}
+	}
+	pick := func(h hit) (string, string, bool) { return h.match, h.id, true }
+	if len(hits) == 1 {
+		return pick(hits[0])
+	}
+	if len(hits) > 1 {
+		for _, h := range hits {
+			if a.ParagraphID != "" && h.id == a.ParagraphID {
+				return pick(h)
+			}
+		}
+		var ctx []hit
+		for _, h := range hits {
+			if ctxMatches(plain, strings.Index(plain, h.match), h.match, a) {
+				ctx = append(ctx, h)
+			}
+		}
+		if len(ctx) == 1 {
+			return pick(ctx[0])
+		}
+		return "", "", false
+	}
+	m, ok := fuzzyFindAnchor(plain, exact)
+	if !ok {
+		return "", "", false
+	}
+	return m, paragraphIDAt(plain, strings.Index(plain, m)), true
 }
 
 // isDocLevel returns true if the anchor represents a document-level
@@ -646,6 +728,9 @@ func (a *API) syncDocumentSource(w http.ResponseWriter, r *http.Request) {
 				"anchor.exact": res.Exact,
 				"updated_at":   time.Now().UTC(),
 			}
+			if res.ParagraphID != "" {
+				set["anchor.paragraph_id"] = res.ParagraphID
+			}
 			unset := bson.M{"orphan": ""}
 			if res.Fuzzy {
 				// Approximate match: keep the original selection for
@@ -706,16 +791,16 @@ func (a *API) syncDocumentSource(w http.ResponseWriter, r *http.Request) {
 // frontend caches this for the matching mergeAccept call so we don't
 // double-bill the user's Anthropic key by re-running the merge.
 type previewMergeResponse struct {
-	MergedContent      string  `json:"mergedContent"`
-	UpstreamContent    string  `json:"upstreamContent"`
-	UpstreamSourceSHA  string  `json:"upstreamSourceSha"`
-	AncestorSourceSHA  string  `json:"ancestorSourceSha"`
-	Model              string  `json:"model"`
-	TokensIn           int64   `json:"tokensIn"`
-	TokensOut          int64   `json:"tokensOut"`
-	CostEstimateUSD    float64 `json:"costEstimateUsd"`
-	Identical          bool    `json:"identical"`
-	NoMergeNeeded      bool    `json:"noMergeNeeded"`
+	MergedContent     string  `json:"mergedContent"`
+	UpstreamContent   string  `json:"upstreamContent"`
+	UpstreamSourceSHA string  `json:"upstreamSourceSha"`
+	AncestorSourceSHA string  `json:"ancestorSourceSha"`
+	Model             string  `json:"model"`
+	TokensIn          int64   `json:"tokensIn"`
+	TokensOut         int64   `json:"tokensOut"`
+	CostEstimateUSD   float64 `json:"costEstimateUsd"`
+	Identical         bool    `json:"identical"`
+	NoMergeNeeded     bool    `json:"noMergeNeeded"`
 }
 
 // mergePreviewSource streams a 3-way Claude merge of (ancestor, current
@@ -968,6 +1053,9 @@ func (a *API) mergeAcceptSource(w http.ResponseWriter, r *http.Request) {
 				"anchor.end":   0,
 				"anchor.exact": res.Exact,
 				"updated_at":   now,
+			}
+			if res.ParagraphID != "" {
+				set["anchor.paragraph_id"] = res.ParagraphID
 			}
 			unset := bson.M{"orphan": ""}
 			if res.Fuzzy {
