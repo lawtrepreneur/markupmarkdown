@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
+import type { Comment } from "../types";
 import { TiptapEditor } from "./TiptapEditor";
 import MarkdownRender from "./MarkdownRender";
 import { baseURLForDoc } from "../utils/baseUrl";
@@ -16,11 +17,13 @@ interface Props {
   onSave: (content: string) => Promise<void> | void;
   onCancel: () => void;
   activeAnchorExact?: string;
+  comments?: Comment[];
+  activeCommentId?: string;
   onLayoutTick?: () => void;
 }
 
 const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPane({
-  initialContent, sourceUrl, saving, onSave, onCancel, activeAnchorExact, onLayoutTick,
+  initialContent, sourceUrl, saving, onSave, onCancel, activeAnchorExact, comments, activeCommentId, onLayoutTick,
 }, ref) {
   const [content, setContent] = useState(initialContent);
   const [showPreview, setShowPreview] = useState(false);
@@ -108,7 +111,7 @@ const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPane({
       </div>
       <div className={`grid gap-3 ${showPreview ? "md:grid-cols-2" : "grid-cols-1"}`}>
         <div className="border border-rule rounded-md bg-card p-3">
-          <TiptapEditor content={initialContent} onReady={setEditor} onChange={(markdown, current) => { setEditor(current); setContent(markdown); onLayoutTick?.(); }} />
+          <TiptapEditor content={initialContent} comments={comments} activeCommentId={activeCommentId} onReady={setEditor} onChange={(markdown, current) => { setEditor(current); setContent(markdown); onLayoutTick?.(); }} />
         </div>
         {showPreview && <div className="border border-rule rounded-md p-3 bg-card"><MarkdownRender content={content} baseUrl={baseURLForDoc(sourceUrl)} sourceUrl={sourceUrl} /></div>}
       </div>

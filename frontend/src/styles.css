@@ -159,3 +159,10 @@ body {
 }
 .mm-prose hr { border: 0; border-top: 1px solid var(--color-rule); margin: 2rem 0; }
 .mm-prose img { max-width: 100%; height: auto; }
+
+.ProseMirror .comment-anchor {
+  background: var(--color-highlight);
+  border-bottom: 2px solid var(--color-highlight-border);
+}
+.ProseMirror .comment-anchor-active { background: var(--color-highlight-active); }
+.ProseMirror .comment-anchor-resolved { background: transparent; border-bottom-style: dotted; }
