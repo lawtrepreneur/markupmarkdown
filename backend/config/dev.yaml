@@ -8,6 +8,7 @@ database:
 
 frontend:
   url: ${FRONTEND_URL:http://localhost:4720}
+  static_dir: ${FRONTEND_STATIC_DIR:./web/dist}
 
 fetch:
   timeout: ${FETCH_TIMEOUT:15s}
