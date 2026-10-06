@@ -2,12 +2,22 @@ package api_test
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	"markupmarkdown/internal/testutil"
 )
 
 func TestListModelsAuthenticatedUsesConfiguredPolicy(t *testing.T) {
+	// Use the repo example policy: 2 enabled, 1 disabled. t.Setenv works
+	// only if config loads after this, but config is loaded once in
+	// TestMain — so this test asserts against modelpolicy.example.json.
+	policyPath := "../../modelpolicy.example.json"
+	if _, err := os.Stat(policyPath); err != nil {
+		t.Skipf("example policy missing: %v", err)
+	}
+	t.Setenv("MODEL_POLICY_PATH", policyPath)
+
 	srv, st, _ := newTestServer(t)
 	user := testutil.NewTestUser(t, st)
 	sess := testutil.NewTestSession(t, st, user.ID)
@@ -17,21 +27,16 @@ func TestListModelsAuthenticatedUsesConfiguredPolicy(t *testing.T) {
 		t.Fatalf("models: status=%d body=%s", status, body)
 	}
 	var models []struct {
-		ID      string `json:"id"`
-		Enabled bool   `json:"enabled"`
+		ID       string `json:"id"`
+		Provider string `json:"provider"`
 	}
 	if err := json.Unmarshal(body, &models); err != nil {
 		t.Fatal(err)
 	}
-	if len(models) == 0 {
-		t.Fatal("configured policy returned no enabled models")
+	if len(models) != 2 {
+		t.Fatalf("expected 2 enabled models, got %d: %s", len(models), body)
 	}
-	for _, model := range models {
-		if model.ID == "" || model.Enabled {
-			t.Fatalf("unexpected model response: %+v", model)
-		}
-		if model.ID == "disabled" {
-			t.Fatal("disabled model returned")
-		}
+	if models[0].ID != "claude-sonnet-4-6" || models[1].ID != "local-llama" {
+		t.Fatalf("unexpected models: %s", body)
 	}
 }

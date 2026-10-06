@@ -32,6 +32,7 @@ import APIKeyModal from "../components/APIKeyModal";
 import ReviseModal from "../components/ReviseModal";
 import ShareModal from "../components/ShareModal";
 import DiffView from "../components/DiffView";
+import MatterSelect from "../components/MatterSelect";
 import type { MatterRevisionDiffResponse, MatterRevisionHistory } from "../types";
 import { useDialog } from "../components/Dialogs";
 import { useToast, toastMessageFor } from "../components/Toast";
@@ -1395,6 +1396,18 @@ export default function DocumentPage() {
             onDownload={handleDownload}
             onDelete={deleteDoc}
           />
+
+           {user && (
+             <MatterSelect
+               matterId={doc.matterId}
+               documentId={doc.id}
+               onChange={async (next) => {
+                 setDoc({ ...doc, matterId: next || undefined });
+                 setMatterDiff(null);
+                 setMatterHistory(next ? await api.getMatterRevisionHistory(id!, next) : []);
+               }}
+             />
+           )}
 
            {doc.matterId && matterHistory.length > 0 && (
              <section className="mb-4 rounded-md border border-rule bg-card p-3 text-sm">

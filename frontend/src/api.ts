@@ -118,6 +118,12 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ title }),
     }),
+  listMatters: () => req<{ matters: string[] }>("/api/matters"),
+  setDocumentMatter: (id: string, matterId: string) =>
+    req<MdDocument>(`/api/documents/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ matterId }),
+    }),
   deleteDocument: (id: string) =>
     req<void>(`/api/documents/${id}`, { method: "DELETE" }),
   /** Per-user "Forget": hide a doc from MY recent list without
