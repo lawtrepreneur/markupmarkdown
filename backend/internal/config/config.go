@@ -26,6 +26,7 @@ type Config struct {
 type OpenCodeConfig struct {
 	BaseURL string `yaml:"base_url"`
 	// MattersDir holds one matter repo per subdir: <MattersDir>/<matterId>.
+	// Deployment default: /home/romeshh/workspace/matters
 	MattersDir string `yaml:"matters_dir"`
 }
 
