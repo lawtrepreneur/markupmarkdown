@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"markupmarkdown/internal/models"
 	"markupmarkdown/internal/testutil"
@@ -186,5 +187,71 @@ func TestApplyAllSuggestions_NoneOpen(t *testing.T) {
 		"/api/documents/"+doc.ID+"/apply-suggestions", nil, withCookie(sess))
 	if status != 400 {
 		t.Errorf("status=%d want 400 when no suggestions", status)
+	}
+}
+
+func countTelemetry(t *testing.T, st interface {
+	TelemetryEvents() *mongo.Collection
+}, commentID, outcome string) int64 {
+	t.Helper()
+	n, err := st.TelemetryEvents().CountDocuments(context.Background(),
+		bson.M{"comment_id": commentID, "outcome": outcome})
+	if err != nil {
+		t.Fatalf("count telemetry: %v", err)
+	}
+	return n
+}
+
+func TestApplySuggestion_RecordsAcceptedTelemetry(t *testing.T) {
+	srv, st, _ := newTestServer(t)
+	user := testutil.NewTestUser(t, st)
+	sess := testutil.NewTestSession(t, st, user.ID)
+	doc := testutil.NewTestDocument(t, st, user.ID, "hello world")
+	c := insertSuggestionComment(t, st, doc.ID, user.ID, "hello", "howdy")
+	status, _ := doJSON(t, srv, "POST",
+		"/api/comments/"+c.ID+"/apply-suggestion", nil, withCookie(sess))
+	if status != 201 {
+		t.Fatalf("status=%d want 201", status)
+	}
+	if n := countTelemetry(t, st, c.ID, "accepted"); n != 1 {
+		t.Errorf("accepted telemetry=%d want 1", n)
+	}
+	if n := countTelemetry(t, st, c.ID, "rejected"); n != 0 {
+		t.Errorf("rejected telemetry=%d want 0", n)
+	}
+}
+
+func TestApplySuggestion_FailedApplyRecordsNoTelemetry(t *testing.T) {
+	srv, st, _ := newTestServer(t)
+	user := testutil.NewTestUser(t, st)
+	sess := testutil.NewTestSession(t, st, user.ID)
+	doc := testutil.NewTestDocument(t, st, user.ID, "hello world")
+	c := insertSuggestionComment(t, st, doc.ID, user.ID, "hello", "hello")
+	status, _ := doJSON(t, srv, "POST",
+		"/api/comments/"+c.ID+"/apply-suggestion", nil, withCookie(sess))
+	if status != 400 {
+		t.Fatalf("status=%d want 400", status)
+	}
+	if n := countTelemetry(t, st, c.ID, "accepted"); n != 0 {
+		t.Errorf("telemetry=%d want 0 on failed apply", n)
+	}
+}
+
+func TestApplyAllSuggestions_RecordsAcceptedPerApplied(t *testing.T) {
+	srv, st, _ := newTestServer(t)
+	user := testutil.NewTestUser(t, st)
+	sess := testutil.NewTestSession(t, st, user.ID)
+	doc := testutil.NewTestDocument(t, st, user.ID, "alpha beta gamma")
+	c1 := insertSuggestionComment(t, st, doc.ID, user.ID, "alpha", "one")
+	c2 := insertSuggestionComment(t, st, doc.ID, user.ID, "gamma", "three")
+	status, _ := doJSON(t, srv, "POST",
+		"/api/documents/"+doc.ID+"/apply-suggestions", nil, withCookie(sess))
+	if status != 201 {
+		t.Fatalf("status=%d want 201", status)
+	}
+	for _, id := range []string{c1.ID, c2.ID} {
+		if n := countTelemetry(t, st, id, "accepted"); n != 1 {
+			t.Errorf("comment %s accepted telemetry=%d want 1", id, n)
+		}
 	}
 }

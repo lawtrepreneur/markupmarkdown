@@ -20,6 +20,13 @@ type Config struct {
 	GitHub          GitHubConfig     `yaml:"github"`
 	Encryption      EncryptionConfig `yaml:"encryption"`
 	ModelPolicyPath string           `yaml:"model_policy_path"`
+	OpenCode        OpenCodeConfig   `yaml:"opencode"`
+}
+
+type OpenCodeConfig struct {
+	BaseURL string `yaml:"base_url"`
+	// MattersDir holds one matter repo per subdir: <MattersDir>/<matterId>.
+	MattersDir string `yaml:"matters_dir"`
 }
 
 type EncryptionConfig struct {

@@ -9,6 +9,7 @@ import (
 
 	"markupmarkdown/internal/config"
 	"markupmarkdown/internal/limits"
+	"markupmarkdown/internal/opencode"
 	"markupmarkdown/internal/secrets"
 	"markupmarkdown/internal/store"
 )
@@ -36,6 +37,9 @@ type API struct {
 	// seam over ai.ReviewDoc (nil = real Claude).
 	autoReviewCh chan string
 	reviewFn     autoReviewFn
+
+	// opencode client; nil when cfg.OpenCode.BaseURL is empty.
+	oc *opencode.Client
 }
 
 func New(cfg *config.Config, st *store.Store) (*API, error) {
@@ -45,6 +49,9 @@ func New(cfg *config.Config, st *store.Store) (*API, error) {
 	}
 	a := &API{cfg: cfg, store: st, hub: NewHub(), vault: vault,
 		autoReviewCh: make(chan string, 64)}
+	if cfg.OpenCode.BaseURL != "" {
+		a.oc = opencode.NewClient(cfg.OpenCode.BaseURL)
+	}
 	a.initLimits()
 	return a, nil
 }
@@ -90,6 +97,7 @@ func (a *API) Register(r *mux.Router) {
 	r.HandleFunc("/api/documents/{id}/comments", a.listComments).Methods("GET")
 	r.HandleFunc("/api/documents/{id}/comments", a.createComment).Methods("POST")
 	r.HandleFunc("/api/documents/{id}/events", a.streamEvents).Methods("GET")
+	r.HandleFunc("/api/documents/{id}/opencode-review", a.opencodeReview).Methods("POST")
 
 	r.HandleFunc("/api/comments/{id}", a.patchComment).Methods("PATCH")
 	r.HandleFunc("/api/comments/{id}", a.deleteComment).Methods("DELETE")
