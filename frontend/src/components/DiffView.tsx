@@ -6,12 +6,28 @@ interface Props {
   original: string;
   revised: string;
   baseUrl?: string;
+  onRevert?: () => void | Promise<void>;
 }
 
 type View = "diff" | "rendered";
 
-export default function DiffView({ original, revised, baseUrl }: Props) {
+export default function DiffView({ original, revised, baseUrl, onRevert }: Props) {
   const [view, setView] = useState<View>("diff");
+  const [reverting, setReverting] = useState(false);
+  const [revertError, setRevertError] = useState<string | null>(null);
+
+  const handleRevert = useCallback(async () => {
+    if (!onRevert || reverting || !window.confirm("Revert these changes?")) return;
+    setReverting(true);
+    setRevertError(null);
+    try {
+      await onRevert();
+    } catch (error) {
+      setRevertError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setReverting(false);
+    }
+  }, [onRevert, reverting]);
   const { hunks, stats } = useMemo(
     () => computeDiff(original, revised),
     [original, revised]
@@ -83,7 +99,16 @@ export default function DiffView({ original, revised, baseUrl }: Props) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center gap-2 text-xs">
+          {onRevert && (
+            <button
+              onClick={handleRevert}
+              disabled={reverting}
+              className="px-2 py-0.5 rounded border border-rule text-muted hover:text-ink hover:bg-soft disabled:opacity-50"
+            >
+              {reverting ? "Reverting…" : "Revert"}
+            </button>
+          )}
           <ViewTab active={view === "diff"} onClick={() => setView("diff")}>
             Diff
           </ViewTab>
@@ -92,6 +117,13 @@ export default function DiffView({ original, revised, baseUrl }: Props) {
           </ViewTab>
         </div>
       </div>
+      {revertError && (
+        <div role="alert" className="px-4 py-2 text-xs text-danger border-b border-rule">
+          {revertError.includes("409")
+            ? "Revert failed: document changed since this diff was created."
+            : `Revert failed: ${revertError}`}
+        </div>
+      )}
 
       <div ref={scrollerRef} className="flex-1 min-h-0 overflow-auto">
         {view === "diff" ? (

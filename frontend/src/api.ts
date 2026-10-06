@@ -9,6 +9,12 @@ import type {
   DocumentSummary,
   MarkdownIndex,
   MarkdownIndexResponse,
+  MatterRevisionDiffResponse,
+  MatterRevisionHistory,
+  MatterRevisionRequest,
+  MatterRevisionResponse,
+  MatterRevisionRevertRequest,
+  MatterRevisionRevertResponse,
   MdDocument,
   MentionCandidate,
   MergePreview,
@@ -47,13 +53,15 @@ export class APIError extends Error {
   kind?: string;
   detail?: string;
   actions?: APIErrorAction[];
+  status?: number;
 
-  constructor(message: string, opts?: { kind?: string; detail?: string; actions?: APIErrorAction[] }) {
+  constructor(message: string, opts?: { kind?: string; detail?: string; actions?: APIErrorAction[]; status?: number }) {
     super(message);
     this.name = "APIError";
     this.kind = opts?.kind;
     this.detail = opts?.detail;
     this.actions = opts?.actions;
+    this.status = opts?.status;
   }
 }
 
@@ -78,7 +86,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
       if (body?.detail) detail = body.detail;
       if (Array.isArray(body?.actions)) actions = body.actions;
     } catch {}
-    throw new APIError(msg, { kind, detail, actions });
+    throw new APIError(msg, { kind, detail, actions, status: res.status });
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -479,6 +487,24 @@ export const api = {
     payload: { content: string; note?: string }
   ) =>
     req<MdDocument>(`/api/documents/${documentId}/manual-revisions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  createMatterRevision: (documentId: string, payload: MatterRevisionRequest) =>
+    req<MatterRevisionResponse>(`/api/documents/${documentId}/matter-revisions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getMatterRevisionHistory: (documentId: string, matterId: string) =>
+    req<MatterRevisionHistory[]>(
+      `/api/documents/${documentId}/matter-revisions?matterId=${encodeURIComponent(matterId)}`
+    ),
+  diffMatterRevision: (documentId: string, matterId: string, from: string, to: string, path?: string) =>
+    req<MatterRevisionDiffResponse>(
+      `/api/documents/${documentId}/matter-revisions/diff?matterId=${encodeURIComponent(matterId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${path ? `&path=${encodeURIComponent(path)}` : ""}`
+    ),
+  revertMatterRevision: (documentId: string, sha: string, payload: MatterRevisionRevertRequest) =>
+    req<MatterRevisionRevertResponse>(`/api/documents/${documentId}/matter-revisions/${encodeURIComponent(sha)}/revert`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),

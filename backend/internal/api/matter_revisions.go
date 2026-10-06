@@ -92,6 +92,28 @@ func matterRepoError(w http.ResponseWriter, err error) {
 	}
 }
 
+func (a *API) matterRevisionList(w http.ResponseWriter, r *http.Request) {
+	_, user := a.matterAuth(w, r, models.TokenScopeRead)
+	if user == nil {
+		return
+	}
+	matterID := r.URL.Query().Get("matterId")
+	if !safeMatterID(matterID) {
+		writeError(w, http.StatusBadRequest, "invalid matterId")
+		return
+	}
+	repo := a.existingRepo(w, matterID)
+	if repo == nil {
+		return
+	}
+	revisions, err := repo.Log()
+	if err != nil {
+		matterRepoError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, revisions)
+}
+
 func (a *API) matterRevisionCommit(w http.ResponseWriter, r *http.Request) {
 	doc, user := a.matterAuth(w, r, models.TokenScopeWrite)
 	if user == nil {

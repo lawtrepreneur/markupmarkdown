@@ -31,6 +31,8 @@ import SignInModal from "../components/SignInModal";
 import APIKeyModal from "../components/APIKeyModal";
 import ReviseModal from "../components/ReviseModal";
 import ShareModal from "../components/ShareModal";
+import DiffView from "../components/DiffView";
+import type { MatterRevisionDiffResponse, MatterRevisionHistory } from "../types";
 import { useDialog } from "../components/Dialogs";
 import { useToast, toastMessageFor } from "../components/Toast";
 import { useSessionReadIds } from "../utils/sessionReadIds";
@@ -56,6 +58,8 @@ export default function DocumentPage() {
 
   const [doc, setDoc] = useState<MdDocument | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [matterHistory, setMatterHistory] = useState<MatterRevisionHistory[]>([]);
+  const [matterDiff, setMatterDiff] = useState<MatterRevisionDiffResponse | null>(null);
   const [error, setError] = useState<APIError | null>(null);
   const [activeId, setActiveIdRaw] = useState<string | null>(null);
   // Comments the viewer has activated, persisted in sessionStorage so
@@ -203,6 +207,12 @@ export default function DocumentPage() {
         refreshSeqRef.current = 1;
         setDoc(d);
         setComments(cs);
+        if (d.matterId) {
+          setMatterHistory(await api.getMatterRevisionHistory(id, d.matterId));
+        } else {
+          setMatterHistory([]);
+        }
+        setMatterDiff(null);
         // If the doc is github-anchored, replace /d/:id in the
         // address bar with /:owner/:repo/blob/:ref/path so the URL
         // reads as the human pasted it (or would copy-paste it).
@@ -1386,7 +1396,41 @@ export default function DocumentPage() {
             onDelete={deleteDoc}
           />
 
-          {driftPresent && doc.sourceUrl && (
+           {doc.matterId && matterHistory.length > 0 && (
+             <section className="mb-4 rounded-md border border-rule bg-card p-3 text-sm">
+               <h2 className="font-medium mb-2">Matter revisions</h2>
+               <div className="space-y-1">
+                 {matterHistory.map((revision) => (
+                   <button key={revision.sha} className="block text-left text-accent hover:underline" onClick={async () => {
+                     const parent = matterHistory.find((item) => item.sha === revision.sha)?.parentSHA ?? "";
+                     setMatterDiff(await api.diffMatterRevision(id!, doc.matterId!, parent, revision.sha));
+                   }}>
+                     {revision.sha.slice(0, 8)} · {revision.operation} · {new Date(revision.createdAt).toLocaleString()}
+                   </button>
+                 ))}
+               </div>
+               {matterDiff && <DiffView original={doc.content} revised={matterDiff.diff} onRevert={async () => {
+                 const head = matterHistory[0];
+                 if (!head) return;
+                 try {
+                   await api.revertMatterRevision(id!, head.sha, { matterId: doc.matterId!, parentSHA: head.parentSHA });
+                   const refreshed = await api.getDocument(id!);
+                   setDoc(refreshed);
+                   setMatterHistory(await api.getMatterRevisionHistory(id!, doc.matterId!));
+                   setMatterDiff(null);
+                 } catch (err) {
+                   if (err instanceof APIError) {
+                     if (err.status === 409) {
+                       throw new Error("Document changed elsewhere; local content was preserved.");
+                     }
+                   }
+                   throw err;
+                 }
+               }} />}
+             </section>
+           )}
+
+           {driftPresent && doc.sourceUrl && (
             <SourceDriftBanner
               githubURL={doc.sourceUrl}
               driftedAt={doc.sourceDriftedAt}

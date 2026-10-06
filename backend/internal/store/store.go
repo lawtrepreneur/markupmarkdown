@@ -1866,6 +1866,13 @@ func (s *Store) UpdateDocumentTitle(ctx context.Context, id, title string) error
 	return err
 }
 
+func (s *Store) UpdateDocumentMatterID(ctx context.Context, id, matterID string) error {
+	_, err := s.Documents().UpdateOne(ctx, bson.M{"_id": id}, bson.M{
+		"$set": bson.M{"matter_id": matterID, "updated_at": time.Now().UTC()},
+	})
+	return err
+}
+
 // SetDocumentSourceCheck stamps the result of a drift check. If
 // latestSHA equals the stored SourceSHA we clear the drift fields;
 // otherwise we record latestSHA + the drift timestamp so the frontend

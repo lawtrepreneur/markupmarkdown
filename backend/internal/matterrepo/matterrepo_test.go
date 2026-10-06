@@ -46,6 +46,15 @@ func TestInitCommitHead(t *testing.T) {
 	}
 }
 
+func TestLog(t *testing.T) {
+	r := newRepo(t)
+	sha := commit(t, r, "", "one\n")
+	revisions, err := r.Log()
+	if err != nil || len(revisions) != 1 || revisions[0].SHA != sha || revisions[0].Actor != "u" || revisions[0].Operation != "save" || revisions[0].Message != "save a" {
+		t.Fatalf("revisions=%+v err=%v", revisions, err)
+	}
+}
+
 func TestStaleParent(t *testing.T) {
 	r := newRepo(t)
 	commit(t, r, "", "one\n")

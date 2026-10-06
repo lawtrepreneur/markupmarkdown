@@ -1,6 +1,23 @@
 package models
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestDocumentMatterIDRoundTrip(t *testing.T) {
+	data, err := json.Marshal(Document{MatterID: "matter-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Document
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.MatterID != "matter-1" {
+		t.Fatalf("MatterID=%q", got.MatterID)
+	}
+}
 
 func TestTokenScope_AllowsScope(t *testing.T) {
 	cases := []struct {

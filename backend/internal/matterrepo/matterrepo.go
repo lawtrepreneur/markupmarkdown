@@ -40,6 +40,16 @@ type CommitMeta struct {
 	RevertOf          string
 }
 
+// Revision is one commit in a matter repository.
+type Revision struct {
+	SHA       string `json:"sha"`
+	ParentSHA string `json:"parentSHA"`
+	CreatedAt string `json:"createdAt"`
+	Actor     string `json:"actor"`
+	Operation string `json:"operation"`
+	Message   string `json:"message"`
+}
+
 // Repo is a handle on one matter's git repository.
 type Repo struct {
 	root string
@@ -84,6 +94,33 @@ func (r *Repo) git(args ...string) (string, error) {
 }
 
 // Head returns HEAD sha, "" if no commits.
+func (r *Repo) Log() ([]Revision, error) {
+	out, err := r.git("log", "--format=%H%x00%P%x00%cI%x00%B%x00")
+	if err != nil {
+		return nil, err
+	}
+	parts := strings.Split(out, "\x00")
+	var revisions []Revision
+	for i := 0; i+3 < len(parts); i += 4 {
+		message := strings.TrimSpace(parts[i+3])
+		lines := strings.SplitN(message, "\n", 2)
+		r := Revision{SHA: parts[i], CreatedAt: parts[i+2], Message: lines[0]}
+		if parts[i+1] != "" {
+			r.ParentSHA = strings.Fields(parts[i+1])[0]
+		}
+		for _, line := range strings.Split(message, "\n") {
+			if strings.HasPrefix(line, "Actor: ") {
+				r.Actor = strings.TrimPrefix(line, "Actor: ")
+			}
+			if strings.HasPrefix(line, "Operation: ") {
+				r.Operation = strings.TrimPrefix(line, "Operation: ")
+			}
+		}
+		revisions = append(revisions, r)
+	}
+	return revisions, nil
+}
+
 func (r *Repo) Head() (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

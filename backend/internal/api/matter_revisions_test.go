@@ -5,6 +5,7 @@ package api_test
 // git binary must be on PATH (matterrepo shells out to it).
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -24,6 +25,51 @@ func commitReqBody(matterID, parentSHA, path, content string) map[string]any {
 			"revisionId":        "r1",
 			"serializerVersion": "1",
 		},
+	}
+}
+
+func TestMatterRevisionList(t *testing.T) {
+	srv, st, api := newTestServer(t)
+	api.SetMattersDirForTest(t.TempDir())
+	u := testutil.NewTestUser(t, st)
+	doc := testutil.NewTestDocument(t, st, u.ID, "")
+	sid := testutil.NewTestSession(t, st, u.ID)
+	url := "/api/documents/" + doc.ID + "/matter-revisions"
+
+	code, body := doJSON(t, srv, "POST", url, commitReqBody("m-list", "", "a.md", "v1"), withCookie(sid))
+	if code != 201 {
+		t.Fatalf("commit: want 201, got %d (%s)", code, body)
+	}
+
+	// Unauthenticated read rejected.
+	if code, _ := doJSON(t, srv, "GET", url+"?matterId=m-list", nil); code != 401 {
+		t.Fatalf("list unauth: want 401, got %d", code)
+	}
+	// Bad matterId.
+	if code, _ := doJSON(t, srv, "GET", url+"?matterId=../evil", nil, withCookie(sid)); code != 400 {
+		t.Fatalf("bad matterId: want 400, got %d", code)
+	}
+	// Unknown matter repo.
+	if code, _ := doJSON(t, srv, "GET", url+"?matterId=nope", nil, withCookie(sid)); code != 404 {
+		t.Fatalf("unknown repo: want 404, got %d", code)
+	}
+
+	code, body = doJSON(t, srv, "GET", url+"?matterId=m-list", nil, withCookie(sid))
+	if code != 200 {
+		t.Fatalf("list: want 200, got %d (%s)", code, body)
+	}
+	var revisions []map[string]any
+	if err := json.Unmarshal([]byte(body), &revisions); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(revisions) != 1 ||
+		revisions[0]["sha"] == "" ||
+		revisions[0]["parentSHA"] != "" ||
+		revisions[0]["createdAt"] == "" ||
+		revisions[0]["actor"] != "human:"+u.ID ||
+		revisions[0]["operation"] != "save" ||
+		revisions[0]["message"] == "" {
+		t.Fatalf("revisions=%+v", revisions)
 	}
 }
 

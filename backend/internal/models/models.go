@@ -30,6 +30,7 @@ type AuthState struct {
 
 type Document struct {
 	ID        string `bson:"_id" json:"id"`
+	MatterID  string `bson:"matter_id,omitempty" json:"matterId,omitempty"`
 	Title     string `bson:"title" json:"title"`
 	SourceURL string `bson:"source_url,omitempty" json:"sourceUrl,omitempty"`
 	Origin    string `bson:"origin" json:"origin"` // "url" | "upload"

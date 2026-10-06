@@ -21,13 +21,15 @@ import (
 )
 
 type createDocumentRequest struct {
-	URL     string `json:"url,omitempty"`
-	Title   string `json:"title,omitempty"`
-	Content string `json:"content,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Title    string `json:"title,omitempty"`
+	Content  string `json:"content,omitempty"`
+	MatterID string `json:"matterId,omitempty"`
 }
 
 type patchDocumentRequest struct {
-	Title *string `json:"title,omitempty"`
+	Title    *string `json:"title,omitempty"`
+	MatterID *string `json:"matterId,omitempty"`
 }
 
 // listDocuments returns only documents the signed-in user has worked on:
@@ -366,6 +368,10 @@ func (a *API) createDocument(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "content too large (max 5 MB)")
 		return
 	}
+	if req.MatterID != "" && !safeMatterID(req.MatterID) {
+		writeError(w, http.StatusBadRequest, "invalid matterId")
+		return
+	}
 	if req.URL != "" {
 		// Strip sentence-terminator punctuation the user may have caught
 		// when copy-pasting a URL out of an email or chat. Without this,
@@ -411,6 +417,7 @@ func (a *API) createDocument(w http.ResponseWriter, r *http.Request) {
 
 	doc := &models.Document{
 		ID:        uuid.NewString(),
+		MatterID:  req.MatterID,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
@@ -493,9 +500,9 @@ func (a *API) createDocument(w http.ResponseWriter, r *http.Request) {
 
 type documentResponse struct {
 	*models.Document
-	Parent             *parentSummary    `json:"parent,omitempty"`
-	Children           []revisionSummary `json:"children,omitempty"`
-	LatestDescendant   *parentSummary    `json:"latestDescendant,omitempty"`
+	Parent           *parentSummary    `json:"parent,omitempty"`
+	Children         []revisionSummary `json:"children,omitempty"`
+	LatestDescendant *parentSummary    `json:"latestDescendant,omitempty"`
 	// RootDocument points at the root of the revision chain. Set only
 	// when the current doc is itself a child revision — frontends use
 	// it to render an "Open original" affordance on the source-drift
@@ -696,6 +703,16 @@ func (a *API) patchDocument(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if req.MatterID != nil {
+		if !safeMatterID(*req.MatterID) {
+			writeError(w, http.StatusBadRequest, "invalid matterId")
+			return
+		}
+		if err := a.store.UpdateDocumentMatterID(r.Context(), id, *req.MatterID); err != nil {
+			internalError(w, "store.update_matter_id", err)
+			return
+		}
+	}
 	if req.Title != nil {
 		title := strings.TrimSpace(*req.Title)
 		if title == "" {
@@ -880,8 +897,8 @@ func (a *API) writeFetchError(w http.ResponseWriter, r *http.Request, srcURL str
 	var ghErr *auth.FetchError
 	if !errors.As(err, &ghErr) {
 		writeJSON(w, http.StatusBadRequest, fetchErrorResponse{
-			Error: "Couldn't fetch this URL.",
-			Kind:  "fetch_other",
+			Error:  "Couldn't fetch this URL.",
+			Kind:   "fetch_other",
 			Detail: err.Error(),
 		})
 		return

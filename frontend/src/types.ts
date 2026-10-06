@@ -294,6 +294,7 @@ export interface MdDocument {
    * Newer than `origin`; switch on this in new code. */
   sourceKind?: "github_blob" | "gist" | "url" | "upload";
   content: string;
+  matterId?: string;
   private?: boolean;
   githubOwner?: string;
   githubRepo?: string;
@@ -381,6 +382,44 @@ export interface RevisionPreview {
   costEstimateUsd: number;
   appliedCommentIds: string[];
   identical: boolean;
+}
+
+export interface MatterRevisionRequest {
+  matterId: string;
+  parentSHA: string;
+  files: Record<string, string>;
+  meta: {
+    session: string;
+    operation: string;
+    revisionId: string;
+    serializerVersion: string;
+  };
+}
+
+export interface MatterRevisionResponse {
+  sha: string;
+}
+
+export interface MatterRevisionHistory {
+  sha: string;
+  parentSHA: string;
+  createdAt: string;
+  actor: string;
+  operation: string;
+  message: string;
+}
+
+export interface MatterRevisionDiffResponse {
+  diff: string;
+}
+
+export interface MatterRevisionRevertRequest {
+  matterId: string;
+  parentSHA: string;
+}
+
+export interface MatterRevisionRevertResponse {
+  sha: string;
 }
 
 /** Pushback metadata — what /pushback/info returns. Lets the modal
