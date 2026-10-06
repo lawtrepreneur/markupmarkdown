@@ -51,6 +51,7 @@ func New(cfg *config.Config, st *store.Store) (*API, error) {
 
 func (a *API) Register(r *mux.Router) {
 	r.HandleFunc("/api/health", a.health).Methods("GET")
+	r.HandleFunc("/api/models", a.listModels).Methods("GET")
 
 	r.HandleFunc("/api/auth/config", a.authConfig).Methods("GET")
 	r.HandleFunc("/api/auth/me", a.authMe).Methods("GET")

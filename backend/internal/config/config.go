@@ -13,12 +13,13 @@ import (
 )
 
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
-	Database   DatabaseConfig   `yaml:"database"`
-	Frontend   FrontendConfig   `yaml:"frontend"`
-	Fetch      FetchConfig      `yaml:"fetch"`
-	GitHub     GitHubConfig     `yaml:"github"`
-	Encryption EncryptionConfig `yaml:"encryption"`
+	Server          ServerConfig     `yaml:"server"`
+	Database        DatabaseConfig   `yaml:"database"`
+	Frontend        FrontendConfig   `yaml:"frontend"`
+	Fetch           FetchConfig      `yaml:"fetch"`
+	GitHub          GitHubConfig     `yaml:"github"`
+	Encryption      EncryptionConfig `yaml:"encryption"`
+	ModelPolicyPath string           `yaml:"model_policy_path"`
 }
 
 type EncryptionConfig struct {
@@ -138,6 +139,11 @@ func Load(path string) (*Config, error) {
 		if cfg.Fetch.MaxBytes == 0 {
 			cfg.Fetch.MaxBytes = 5 * 1024 * 1024
 		}
+	}
+	// MODEL_POLICY_PATH overrides the yaml value; unset means no policy
+	// file configured and /api/models serves an empty list.
+	if v := os.Getenv("MODEL_POLICY_PATH"); v != "" {
+		cfg.ModelPolicyPath = v
 	}
 	return &cfg, nil
 }
