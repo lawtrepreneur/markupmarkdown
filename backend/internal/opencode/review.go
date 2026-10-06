@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -29,15 +28,16 @@ const outputSpec = `Reply ONLY with a JSON array of {"quoted","replacement","rat
 type Result struct {
 	Manifest    Manifest
 	Suggestions []Suggestion
-	Dropped     int
+	Dropped     int // quoted not found in doc
+	Ambiguous   int // quoted found more than once in doc
 }
 
-// RunReview runs one review; timeout is the hard limit (0 = ReviewTimeout).
-func (c *Client) RunReview(ctx context.Context, matterRoot string, selectedPaths []string, preset, model, doc string) (*Result, error) {
-	return c.runReview(ctx, ReviewTimeout, matterRoot, selectedPaths, preset, model, doc)
+// RunReview runs one review bounded by ReviewTimeout.
+func (c *Client) RunReview(ctx context.Context, matterID, matterRoot string, selectedPaths []string, preset, model, doc string) (*Result, error) {
+	return c.runReview(ctx, ReviewTimeout, matterID, matterRoot, selectedPaths, preset, model, doc)
 }
 
-func (c *Client) runReview(ctx context.Context, timeout time.Duration, matterRoot string, selectedPaths []string, preset, model, doc string) (*Result, error) {
+func (c *Client) runReview(ctx context.Context, timeout time.Duration, matterID, matterRoot string, selectedPaths []string, preset, model, doc string) (*Result, error) {
 	tpl, ok := Presets[preset]
 	if !ok {
 		return nil, fmt.Errorf("opencode: unknown preset %q", preset)
@@ -45,9 +45,12 @@ func (c *Client) runReview(ctx context.Context, timeout time.Duration, matterRoo
 	if err := validatePaths(matterRoot, selectedPaths); err != nil {
 		return nil, err
 	}
+	if timeout <= 0 {
+		timeout = ReviewTimeout
+	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	sid, err := c.CreateSession(ctx, matterRoot, model)
+	sid, err := c.CreateSession(ctx, matterRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +60,7 @@ func (c *Client) runReview(ctx context.Context, timeout time.Duration, matterRoo
 		defer cf()
 		_ = c.CloseSession(cc, sid)
 	}()
-	m := Manifest{
-		MatterID: filepath.Base(matterRoot), SessionID: sid,
-		SelectedPaths: append([]string(nil), selectedPaths...),
-		ReadFiles:     []string{}, ReadTracking: "incomplete", CreatedAt: time.Now().UTC(),
-	}
+	m := newManifest(matterID, sid, selectedPaths)
 	prompt := tpl + "Files: " + strings.Join(selectedPaths, ", ") + "\n" + outputSpec + "\n\nDOCUMENT:\n" + doc
 	out, err := c.send(ctx, sid, model, prompt)
 	if err != nil {
@@ -73,10 +72,17 @@ func (c *Client) runReview(ctx context.Context, timeout time.Duration, matterRoo
 	}
 	res := &Result{Manifest: m}
 	for _, s := range all {
-		if s.Quoted != "" && strings.Contains(doc, s.Quoted) {
+		n := 0
+		if s.Quoted != "" {
+			n = strings.Count(doc, s.Quoted)
+		}
+		switch n {
+		case 1:
 			res.Suggestions = append(res.Suggestions, s)
-		} else {
+		case 0:
 			res.Dropped++
+		default:
+			res.Ambiguous++
 		}
 	}
 	return res, nil

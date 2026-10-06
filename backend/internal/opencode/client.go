@@ -10,11 +10,10 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
-// Endpoint paths. Verified against opencode.ai/docs/server except:
-// UNVERIFIED: DELETE /session/:id (docs list it in session table; not fetched in detail),
-// UNVERIFIED: ?directory= query param for project root.
+// Endpoint paths verified against https://opencode.ai/docs/server/.
 const (
 	pathSession = "/session"
 	pathMessage = "/session/%s/message"
@@ -27,7 +26,7 @@ type Client struct {
 }
 
 func NewClient(baseURL string) *Client {
-	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), HTTP: &http.Client{}}
+	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), HTTP: &http.Client{Timeout: 30 * time.Second}}
 }
 
 func (c *Client) do(ctx context.Context, method, path, dir string, in, out any) error {
@@ -48,7 +47,14 @@ func (c *Client) do(ctx context.Context, method, path, dir string, in, out any) 
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.HTTP.Do(req)
+	// ponytail: reviews can outlive http.Client.Timeout; ctx-bound deadline is
+	// the real limit — only add one if caller gave none.
+	if _, ok := ctx.Deadline(); !ok {
+		var cf context.CancelFunc
+		ctx, cf = context.WithTimeout(ctx, 30*time.Second)
+		defer cf()
+	}
+	resp, err := c.HTTP.Do(req.WithContext(ctx))
 	if err != nil {
 		return err
 	}
@@ -63,8 +69,8 @@ func (c *Client) do(ctx context.Context, method, path, dir string, in, out any) 
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// CreateSession returns the new session id. model is recorded by SendReview.
-func (c *Client) CreateSession(ctx context.Context, projectRoot, model string) (string, error) {
+// CreateSession returns the new session id.
+func (c *Client) CreateSession(ctx context.Context, projectRoot string) (string, error) {
 	var s struct {
 		ID string `json:"id"`
 	}
