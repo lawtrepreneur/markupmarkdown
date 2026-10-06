@@ -8,6 +8,25 @@ import (
 	"time"
 )
 
+func TestLoad_DevUserOnlyInDev(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("fetch: {}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEV_USER", "local")
+	t.Setenv("MARKUPMARKDOWN_ENV", "dev")
+	cfg, err := Load(path)
+	if err != nil || cfg.DevUser != "local" {
+		t.Fatalf("dev user=%q, err=%v", cfg.DevUser, err)
+	}
+	t.Setenv("MARKUPMARKDOWN_ENV", "prod")
+	cfg, err = Load(path)
+	if err != nil || cfg.DevUser != "" {
+		t.Fatalf("prod user=%q, err=%v", cfg.DevUser, err)
+	}
+}
+
 func TestGitHubConfig_Enabled(t *testing.T) {
 	cases := []struct {
 		g    GitHubConfig

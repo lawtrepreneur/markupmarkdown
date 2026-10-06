@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"net/http"
 	"net/url"
@@ -40,6 +41,9 @@ func authTokenFromHeader(r *http.Request) string {
 	return strings.TrimSpace(h[7:])
 }
 
+// devUser builds the deterministic local user for cfg.DevUser.
+// uuid is a good fit for deterministic ID; dev only.
+
 // HashToken returns the SHA-256 hex digest of t. Exported for the MCP server.
 func HashToken(t string) string {
 	sum := sha256.Sum256([]byte(t))
@@ -59,6 +63,19 @@ func (a *API) gh() *auth.GitHubClient {
 // cookie when both are present so a script with a token attached doesn't
 // silently fall back to the browser's logged-in user.
 func (a *API) currentUser(r *http.Request) *models.User {
+	if a.cfg != nil && a.cfg.DevUser != "" {
+		hash := sha256.Sum256([]byte("markupmarkdown:dev:" + a.cfg.DevUser))
+		u := &models.User{
+			ID:       uuid.NewSHA1(uuid.NameSpaceURL, []byte("markupmarkdown:dev:"+a.cfg.DevUser)).String(),
+			GitHubID: int64(binary.BigEndian.Uint64(hash[:]) &^ (1 << 63)),
+			Login:    a.cfg.DevUser,
+			Name:     a.cfg.DevUser,
+		}
+		if err := a.store.UpsertUserByGitHubID(r.Context(), u); err != nil {
+			return nil
+		}
+		return u
+	}
 	if tok := authTokenFromHeader(r); tok != "" {
 		if u := a.userFromToken(r, tok); u != nil {
 			return u

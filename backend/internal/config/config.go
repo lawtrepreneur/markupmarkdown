@@ -13,7 +13,9 @@ import (
 )
 
 type Config struct {
-	Server          ServerConfig     `yaml:"server"`
+	Server ServerConfig `yaml:"server"`
+	// DevUser enables deterministic local authentication only in dev.
+	DevUser         string           `yaml:"-"`
 	Database        DatabaseConfig   `yaml:"database"`
 	Frontend        FrontendConfig   `yaml:"frontend"`
 	Fetch           FetchConfig      `yaml:"fetch"`
@@ -152,6 +154,9 @@ func Load(path string) (*Config, error) {
 	// file configured and /api/models serves an empty list.
 	if v := os.Getenv("MODEL_POLICY_PATH"); v != "" {
 		cfg.ModelPolicyPath = v
+	}
+	if os.Getenv("MARKUPMARKDOWN_ENV") == "dev" {
+		cfg.DevUser = os.Getenv("DEV_USER")
 	}
 	return &cfg, nil
 }
