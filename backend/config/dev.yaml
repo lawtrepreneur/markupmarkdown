@@ -21,3 +21,6 @@ github:
 
 encryption:
   master_key: ${MARKUPMARKDOWN_ENCRYPTION_KEY:}
+opencode:
+  base_url: ${OPENCODE_BASE_URL:}
+  matters_dir: ${OPENCODE_MATTERS_DIR:/home/romeshh/workspace/matters}
