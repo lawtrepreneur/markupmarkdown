@@ -65,6 +65,24 @@ func TestReanchorComments_DocLevelLeftAlone(t *testing.T) {
 	}
 }
 
+func TestReanchorComments_WholesaleRewriteOrphansAnchors(t *testing.T) {
+	comments := []models.Comment{
+		{ID: "c1", Anchor: models.Anchor{Exact: "first paragraph"}},
+		{ID: "c2", Anchor: models.Anchor{Exact: "second paragraph"}},
+		{ID: "c3", Anchor: models.Anchor{}},
+	}
+	out := reanchorComments(comments, "A wholly rewritten document with none of the original text.")
+	if out[0].Status != reanchorOrphan || out[0].OriginalExact != "first paragraph" {
+		t.Fatalf("first=%+v want orphan with original exact", out[0])
+	}
+	if out[1].Status != reanchorOrphan || out[1].OriginalExact != "second paragraph" {
+		t.Fatalf("second=%+v want orphan with original exact", out[1])
+	}
+	if out[2].Status != reanchorDocLevel {
+		t.Fatalf("doc-level status=%v want doc-level", out[2].Status)
+	}
+}
+
 func TestReanchorComments_OrphanRevivesWhenSourceRestored(t *testing.T) {
 	// Comment was previously marked orphan. anchor.exact is preserved
 	// from before. If the user reverts the source and the original text
