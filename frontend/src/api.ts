@@ -380,7 +380,8 @@ export const api = {
     documentId: string,
     onDelta: (text: string) => void,
     signal?: AbortSignal,
-    commentIds?: string[]
+    commentIds?: string[],
+    model?: string
   ): Promise<RevisionPreview> => {
     const res = await fetch(`/api/documents/${documentId}/revise`, {
       method: "POST",
@@ -389,7 +390,7 @@ export const api = {
         Accept: "text/event-stream",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ commentIds: commentIds ?? [] }),
+      body: JSON.stringify({ commentIds: commentIds ?? [], ...(model ? { model } : {}) }),
       signal,
     });
     if (!res.ok || !res.body) {

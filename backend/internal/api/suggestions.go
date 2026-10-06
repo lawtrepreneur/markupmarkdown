@@ -10,6 +10,7 @@ package api
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"markupmarkdown/internal/models"
+	"markupmarkdown/internal/telemetry"
 )
 
 // applySuggestion is POST /api/comments/:id/apply-suggestion. Reads
@@ -140,8 +142,9 @@ func (a *API) applySuggestion(w http.ResponseWriter, r *http.Request) {
 		a.logTokenAction(r.Context(), info.TokenID, "suggestion.apply", child.ID)
 	}
 	a.hub.Broadcast(doc.ID, "doc-updated")
+	a.recordSuggestionTelemetry(r, comment.ID, doc, comment.Suggestion, "accepted")
 
-		// Summon the chain's standing reviewers onto the new revision.
+	// Summon the chain's standing reviewers onto the new revision.
 	authorTok := ""
 	if info, ok := tokenInfoFromRequest(r); ok {
 		authorTok = info.TokenID
@@ -314,6 +317,10 @@ func (a *API) applyAllSuggestions(w http.ResponseWriter, r *http.Request) {
 	}
 	a.hub.Broadcast(doc.ID, "doc-updated")
 
+	for _, c := range applied {
+		a.recordSuggestionTelemetry(r, c.ID, doc, c.Suggestion, "accepted")
+	}
+
 	authorTok := ""
 	if info, ok := tokenInfoFromRequest(r); ok {
 		authorTok = info.TokenID
@@ -332,6 +339,15 @@ func (a *API) applyAllSuggestions(w http.ResponseWriter, r *http.Request) {
 		"applied":  appliedIDs,
 		"skipped":  skipped,
 	})
+}
+
+func (a *API) recordSuggestionTelemetry(r *http.Request, commentID string, doc *models.Document, suggestion *models.Suggestion, outcome string) {
+	if err := telemetry.Record(r.Context(), a.store, telemetry.Event{
+		SuggestionID: commentID, CommentID: commentID, MatterID: doc.ID,
+		Model: "suggestion", Outcome: outcome, CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		log.Printf("suggestion telemetry: %v", err)
+	}
 }
 
 // sortCandidates is a tiny wrapper so the batch handler reads cleanly.

@@ -1,0 +1,7 @@
+{
+  "models": [
+    { "id": "claude-sonnet-4-6", "provider": "anthropic", "external": true, "enabled": true },
+    { "id": "local-llama", "provider": "local", "external": false, "enabled": true },
+    { "id": "claude-opus-4-6", "provider": "anthropic", "external": true, "enabled": false }
+  ]
+}

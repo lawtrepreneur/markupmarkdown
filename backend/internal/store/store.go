@@ -55,25 +55,26 @@ func (s *Store) Close(ctx context.Context) error {
 	return s.client.Disconnect(ctx)
 }
 
-func (s *Store) Documents() *mongo.Collection      { return s.db.Collection("documents") }
-func (s *Store) Comments() *mongo.Collection       { return s.db.Collection("comments") }
-func (s *Store) Users() *mongo.Collection          { return s.db.Collection("users") }
-func (s *Store) Sessions() *mongo.Collection       { return s.db.Collection("sessions") }
-func (s *Store) AuthStates() *mongo.Collection     { return s.db.Collection("auth_states") }
-func (s *Store) UserSecrets() *mongo.Collection    { return s.db.Collection("user_secrets") }
-func (s *Store) DocumentViews() *mongo.Collection  { return s.db.Collection("document_views") }
-func (s *Store) Notifications() *mongo.Collection  { return s.db.Collection("notifications") }
-func (s *Store) APITokens() *mongo.Collection      { return s.db.Collection("api_tokens") }
-func (s *Store) TokenEvents() *mongo.Collection    { return s.db.Collection("token_events") }
-func (s *Store) Indexes() *mongo.Collection        { return s.db.Collection("indexes") }
-func (s *Store) HiddenItems() *mongo.Collection    { return s.db.Collection("hidden_items") }
-func (s *Store) IndexItems() *mongo.Collection     { return s.db.Collection("index_items") }
-func (s *Store) Reviews() *mongo.Collection        { return s.db.Collection("reviews") }
-func (s *Store) ReviewRequests() *mongo.Collection { return s.db.Collection("review_requests") }
+func (s *Store) Documents() *mongo.Collection       { return s.db.Collection("documents") }
+func (s *Store) Comments() *mongo.Collection        { return s.db.Collection("comments") }
+func (s *Store) Users() *mongo.Collection           { return s.db.Collection("users") }
+func (s *Store) Sessions() *mongo.Collection        { return s.db.Collection("sessions") }
+func (s *Store) AuthStates() *mongo.Collection      { return s.db.Collection("auth_states") }
+func (s *Store) UserSecrets() *mongo.Collection     { return s.db.Collection("user_secrets") }
+func (s *Store) DocumentViews() *mongo.Collection   { return s.db.Collection("document_views") }
+func (s *Store) Notifications() *mongo.Collection   { return s.db.Collection("notifications") }
+func (s *Store) APITokens() *mongo.Collection       { return s.db.Collection("api_tokens") }
+func (s *Store) TokenEvents() *mongo.Collection     { return s.db.Collection("token_events") }
+func (s *Store) TelemetryEvents() *mongo.Collection { return s.db.Collection("telemetry_events") }
+func (s *Store) Indexes() *mongo.Collection         { return s.db.Collection("indexes") }
+func (s *Store) HiddenItems() *mongo.Collection     { return s.db.Collection("hidden_items") }
+func (s *Store) IndexItems() *mongo.Collection      { return s.db.Collection("index_items") }
+func (s *Store) Reviews() *mongo.Collection         { return s.db.Collection("reviews") }
+func (s *Store) ReviewRequests() *mongo.Collection  { return s.db.Collection("review_requests") }
 func (s *Store) ReviewSubscriptions() *mongo.Collection {
 	return s.db.Collection("review_subscriptions")
 }
-func (s *Store) CheckPolicies() *mongo.Collection { return s.db.Collection("check_policies") }
+func (s *Store) CheckPolicies() *mongo.Collection  { return s.db.Collection("check_policies") }
 func (s *Store) CheckTemplates() *mongo.Collection { return s.db.Collection("check_templates") }
 
 func (s *Store) ensureIndexes(ctx context.Context) {
@@ -1206,7 +1207,7 @@ func (s *Store) RecordDocumentView(ctx context.Context, documentID, userID strin
 	_, err := s.DocumentViews().UpdateOne(ctx,
 		bson.M{"_id": id},
 		bson.M{
-			"$set":         bson.M{"last_viewed_at": now},
+			"$set": bson.M{"last_viewed_at": now},
 			"$setOnInsert": bson.M{
 				"_id":             id,
 				"document_id":     documentID,

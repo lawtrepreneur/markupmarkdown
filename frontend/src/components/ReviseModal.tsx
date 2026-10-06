@@ -5,6 +5,7 @@ import DiffView from "./DiffView";
 import ErrorBlock from "./ErrorBlock";
 import MarkdownRender from "./MarkdownRender";
 import { baseURLForDoc } from "../utils/baseUrl";
+import ModelSelector from "./ModelSelector";
 import { useToast } from "./Toast";
 
 interface Props {
@@ -28,6 +29,7 @@ export default function ReviseModal({
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     resolvedComments.map((c) => c.id)
   );
+  const [model, setModel] = useState("");
   const [phase, setPhase] = useState<Phase>("intro");
   const [preview, setPreview] = useState<RevisionPreview | null>(null);
   const [error, setError] = useState<APIError | null>(null);
@@ -67,7 +69,8 @@ export default function ReviseModal({
             setStreamed(streamedRef.current);
           },
           ctrl.signal,
-          selectedIds
+          selectedIds,
+          model || undefined
         );
         if (cancelled) return;
         setPreview(result);
@@ -98,6 +101,8 @@ export default function ReviseModal({
       window.clearTimeout(abortTimer);
       ctrl.abort();
     };
+    // model intentionally omitted: only read when phase flips to generating
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, doc.id, selectedIds]);
 
   async function accept() {
@@ -177,6 +182,8 @@ export default function ReviseModal({
               resolvedComments={resolvedComments}
               selectedIds={selectedIds}
               setSelectedIds={setSelectedIds}
+              model={model}
+              setModel={setModel}
               onStart={startGeneration}
               onCancel={onClose}
             />
@@ -253,9 +260,13 @@ function IntroPanel({
   resolvedComments,
   selectedIds,
   setSelectedIds,
+  model,
+  setModel,
   onStart,
   onCancel,
 }: {
+  model: string;
+  setModel: (id: string) => void;
   docTitle: string;
   isPrivate: boolean;
   resolvedComments: Comment[];
@@ -325,6 +336,11 @@ function IntroPanel({
           );
         })}
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-ink mb-4">
+        Model
+        <ModelSelector value={model} onChange={setModel} />
+      </label>
 
       <div className="bg-soft border border-rule rounded p-3 text-xs text-muted mb-4">
         <strong className="text-ink">Heads up:</strong> the document content
